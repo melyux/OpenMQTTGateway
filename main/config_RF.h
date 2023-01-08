@@ -1,15 +1,15 @@
-/*  
-  OpenMQTTGateway  - ESP8266 or Arduino program for home automation 
+/*
+  OpenMQTTGateway  - ESP8266 or Arduino program for home automation
 
-   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker 
+   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker
    Send and receiving command by MQTT
- 
+
    This files enables to set your parameter for the radiofrequency gateways (ZgatewayRF and ZgatewayRF2) with RCswitch and newremoteswitch library
-  
+
     Copyright: (c)Florian ROBERT
-  
+
     This file is part of OpenMQTTGateway.
-    
+
     OpenMQTTGateway is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -119,15 +119,37 @@ float receiveMhz = CC1101_FREQUENCY;
 #endif
 
 /*-------------------PIN DEFINITIONS----------------------*/
-#ifndef RF_RECEIVER_GPIO
+#ifndef RF_PILIGHT_RECEIVER_GPIO
 #  ifdef ESP8266
-#    define RF_RECEIVER_GPIO 0 // D3 on nodemcu // put 4 with rf bridge direct mod
+#    define RF_PILIGHT_RECEIVER_GPIO 0 // D3 on nodemcu // put 4 with rf bridge direct mod
 #  elif ESP32
-#    define RF_RECEIVER_GPIO 27 // D27 on DOIT ESP32
+#    define RF_PILIGHT_RECEIVER_GPIO 27 // D27 on DOIT ESP32
 #  elif __AVR_ATmega2560__
-#    define RF_RECEIVER_GPIO 1 //1 = D3 on mega
+#    define RF_PILIGHT_RECEIVER_GPIO 1 //1 = D3 on mega
 #  else
-#    define RF_RECEIVER_GPIO 1 //1 = D3 on arduino
+#    define RF_PILIGHT_RECEIVER_GPIO 1 //1 = D3 on arduino
+#  endif
+#endif
+#ifndef RF_RF_RECEIVER_GPIO
+#  ifdef ESP8266
+#    define RF_RF_RECEIVER_GPIO 0
+#  elif ESP32
+#    define RF_RF_RECEIVER_GPIO 0
+#  elif __AVR_ATmega2560__
+#    define RF_RF_RECEIVER_GPIO 0
+#  else
+#    define RF_RF_RECEIVER_GPIO 0
+#  endif
+#endif
+#ifndef RF_RF2_RECEIVER_GPIO
+#  ifdef ESP8266
+#    define RF_RF2_RECEIVER_GPIO 0
+#  elif ESP32
+#    define RF_RF2_RECEIVER_GPIO 0
+#  elif __AVR_ATmega2560__
+#    define RF_RF2_RECEIVER_GPIO 0
+#  else
+#    define RF_RF2_RECEIVER_GPIO 0
 #  endif
 #endif
 
@@ -150,15 +172,15 @@ float receiveMhz = CC1101_FREQUENCY;
  * Active Receiver Module
  * 1 = ZgatewayPilight
  * 2 = ZgatewayRF
- * 3 = ZgatewayRTL_433
- * 4 = ZgatewayRF2
+ * 4 = ZgatewayRTL_433
+ * 8 = ZgatewayRF2
  */
 int activeReceiver = 0;
 #  define ACTIVE_RECERROR 0
 #  define ACTIVE_PILIGHT  1
 #  define ACTIVE_RF       2
-#  define ACTIVE_RTL      3
-#  define ACTIVE_RF2      4
+#  define ACTIVE_RTL      4
+#  define ACTIVE_RF2      8
 
 #  if defined(ZradioCC1101) || defined(ZradioSX127x)
 bool validFrequency(float mhz) {
@@ -181,27 +203,23 @@ extern void stateMeasures(); // Send a status message
 #    if defined(ESP8266) || defined(ESP32)
 // Check if a receiver is available
 bool validReceiver(int receiver) {
-  switch (receiver) {
 #      ifdef ZgatewayPilight
-    case ACTIVE_PILIGHT:
-      return true;
+  receiver -= ACTIVE_PILIGHT;
 #      endif
 #      ifdef ZgatewayRF
-    case ACTIVE_RF:
-      return true;
+  receiver -= ACTIVE_RF;
 #      endif
 #      ifdef ZgatewayRTL_433
-    case ACTIVE_RTL:
-      return true;
+  receiver -= ACTIVE_RTL;
 #      endif
 #      ifdef ZgatewayRF2
-    case ACTIVE_RF2:
-      return true;
+  receiver -= ACTIVE_RF2;
 #      endif
-    default:
-      Log.error(F("ERROR: stored receiver %d not available" CR), receiver);
+  if (receiver > 0) {
+    Log.error(F("ERROR: at least 1 stored receiver is not available" CR));
+    return false;
   }
-  return false;
+  return true;
 }
 #    endif
 #  endif
@@ -233,63 +251,69 @@ void enableActiveReceiver(bool isBoot) {
 
   // if (currentReceiver != activeReceiver) {
   Log.trace(F("enableActiveReceiver: %d" CR), activeReceiver);
-  switch (activeReceiver) {
-#  ifdef ZgatewayPilight
-    case ACTIVE_PILIGHT:
-      enablePilightReceive();
-      break;
-#  endif
-#  ifdef ZgatewayRF
-    case ACTIVE_RF:
-      enableRFReceive();
-      break;
-#  endif
-#  ifdef ZgatewayRTL_433
-    case ACTIVE_RTL:
-      enableRTLreceive();
-      break;
-#  endif
-#  ifdef ZgatewayRF2
-    case ACTIVE_RF2:
-      enableRF2Receive();
-      break;
-#  endif
-#  ifndef ARDUINO_AVR_UNO // Space issues with the UNO
-    default:
-      Log.error(F("ERROR: unsupported receiver %d" CR), activeReceiver);
-#  endif
+  bool recognized = false;
+# ifdef ZgatewayPilight
+  if ((activeReceiver & ACTIVE_PILIGHT) == ACTIVE_PILIGHT) {
+    enablePilightReceive();
+    recognized = true;
   }
+# endif
+# ifdef ZgatewayRF
+  if ((activeReceiver & ACTIVE_RF) == ACTIVE_RF) {
+    enableRFReceive();
+    recognized = true;
+  }
+# endif
+# ifdef ZgatewayRTL_433
+  if ((activeReceiver & ACTIVE_RTL) == ACTIVE_RTL) {
+    enableRTLreceive();
+    recognized = true;
+  }
+# endif
+# ifdef ZgatewayRF2
+  if ((activeReceiver & ACTIVE_RF2) == ACTIVE_RF2) {
+    enableRF2Receive();
+    recognized = true;
+  }
+# endif
+# ifndef ARDUINO_AVR_UNO // Space issues with the UNO
+  if (!recognized)
+    Log.error(F("ERROR: unsupported receiver %d" CR), activeReceiver);
+# endif
   currentReceiver = activeReceiver;
 }
 
 void disableActiveReceiver() {
   Log.trace(F("disableActiveReceiver: %d" CR), activeReceiver);
-  switch (activeReceiver) {
-#  ifdef ZgatewayPilight
-    case ACTIVE_PILIGHT:
-      disablePilightReceive();
-      break;
-#  endif
-#  ifdef ZgatewayRF
-    case ACTIVE_RF:
-      disableRFReceive();
-      break;
-#  endif
-#  ifdef ZgatewayRTL_433
-    case ACTIVE_RTL:
-      disableRTLreceive();
-      break;
-#  endif
-#  ifdef ZgatewayRF2
-    case ACTIVE_RF2:
-      disableRF2Receive();
-      break;
-#  endif
-#  ifndef ARDUINO_AVR_UNO // Space issues with the UNO
-    default:
-      Log.error(F("ERROR: unsupported receiver %d" CR), activeReceiver);
-#  endif
+  bool recognized = false;
+# ifdef ZgatewayPilight
+  if ((activeReceiver & ACTIVE_PILIGHT) == ACTIVE_PILIGHT) {
+    disablePilightReceive();
+    recognized = true;
   }
+# endif
+# ifdef ZgatewayRF
+  if ((activeReceiver & ACTIVE_RF) == ACTIVE_RF) {
+    disableRFReceive();
+    recognized = true;
+  }
+# endif
+# ifdef ZgatewayRTL_433
+  if ((activeReceiver & ACTIVE_RTL) == ACTIVE_RTL) {
+    disableRTLreceive();
+    recognized = true;
+  }
+# endif
+# ifdef ZgatewayRF2
+  if ((activeReceiver & ACTIVE_RF2) == ACTIVE_RF2) {
+    disableRF2Receive();
+    recognized = true;
+  }
+# endif
+# ifndef ARDUINO_AVR_UNO // Space issues with the UNO
+  if (!recognized)
+    Log.error(F("ERROR: unsupported receiver %d" CR), activeReceiver);
+# endif
 }
 
 #endif

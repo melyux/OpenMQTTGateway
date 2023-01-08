@@ -90,8 +90,13 @@ extern void MQTTtoRTL_433(char* topicOri, JsonObject& RTLdata) {
       success = true;
     }
     if (RTLdata.containsKey("active")) {
-      Log.trace(F("RTL_433 active:" CR));
-      activeReceiver = ACTIVE_RTL; // Enable RTL_433 Gateway
+      if (RTLdata["active"].as<bool>()) {
+        Log.trace(F("RTL_433 active:" CR));
+        activeReceiver |= ACTIVE_RTL; // Enable RTL_433 Gateway
+      } else {
+        Log.trace(F("RTL_433 inactive:" CR));
+        activeReceiver &= ~ACTIVE_RTL; // Disable RTL_433 Gateway
+      }
       success = true;
     }
     if (RTLdata.containsKey("rssi")) {
@@ -132,15 +137,6 @@ extern void MQTTtoRTL_433(char* topicOri, JsonObject& RTLdata) {
 
 extern void enableRTLreceive() {
   Log.notice(F("Switching to RTL_433 Receiver: %FMhz" CR), receiveMhz);
-#  ifdef ZgatewayRF
-  disableRFReceive();
-#  endif
-#  ifdef ZgatewayRF2
-  disableRF2Receive();
-#  endif
-#  ifdef ZgatewayPilight
-  disablePilightReceive();
-#  endif
 
   rtl_433.initReceiver(RF_MODULE_RECEIVER_GPIO, receiveMhz);
   rtl_433.enableReceiver(RF_MODULE_RECEIVER_GPIO);

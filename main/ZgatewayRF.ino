@@ -1,17 +1,17 @@
-/*  
-  OpenMQTTGateway  - ESP8266 or Arduino program for home automation 
+/*
+  OpenMQTTGateway  - ESP8266 or Arduino program for home automation
 
-   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker 
+   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker
    Send and receiving command by MQTT
- 
+
   This gateway enables to:
  - receive MQTT data from a topic and send RF 433Mhz signal corresponding to the received MQTT data
  - publish MQTT data to a different topic related to received 433Mhz signal
 
     Copyright: (c)Florian ROBERT
-  
+
     This file is part of OpenMQTTGateway.
-    
+
     OpenMQTTGateway is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -109,7 +109,7 @@ void RFtoMQTTdiscovery(SIGNAL_SIZE_UL_ULL MQTTvalue) {
 void setupRF() {
   //RF init parameters
   Log.notice(F("RF_EMITTER_GPIO: %d " CR), RF_EMITTER_GPIO);
-  Log.notice(F("RF_RECEIVER_GPIO: %d " CR), RF_RECEIVER_GPIO);
+  Log.notice(F("RF_RF_RECEIVER_GPIO: %d " CR), RF_RF_RECEIVER_GPIO);
 #  ifdef ZradioCC1101 //receiving with CC1101
   if (ELECHOUSE_cc1101.getCC1101()) {
     Log.notice(F("C1101 spi Connection OK" CR));
@@ -126,7 +126,7 @@ void setupRF() {
   mySwitch.enableTransmit(RF_EMITTER_GPIO);
 #  endif
   mySwitch.setRepeatTransmit(RF_EMITTER_REPEAT);
-  mySwitch.enableReceive(RF_RECEIVER_GPIO);
+  mySwitch.enableReceive(RF_RF_RECEIVER_GPIO);
   Log.trace(F("ZgatewayRF command topic: %s%s%s" CR), mqtt_topic, gateway_name, subjectMQTTtoRF);
   Log.trace(F("ZgatewayRF setup done" CR));
 }
@@ -237,7 +237,7 @@ void MQTTtoRF(char* topicOri, char* datacallback) {
 #    ifdef ZradioCC1101 // set Receive on and Transmitt off
   ELECHOUSE_cc1101.SetRx(receiveMhz);
   mySwitch.disableTransmit();
-  mySwitch.enableReceive(RF_RECEIVER_GPIO);
+  mySwitch.enableReceive(RF_RF_RECEIVER_GPIO);
 #    endif
 }
 #  endif
@@ -274,8 +274,13 @@ void MQTTtoRF(char* topicOri, JsonObject& RFdata) { // json object decoding
     } else {
       bool success = false;
       if (RFdata.containsKey("active")) {
-        Log.trace(F("RF active:" CR));
-        activeReceiver = ACTIVE_RF;
+        if (RFdata["active"].as<bool>()) {
+          Log.trace(F("RF active:" CR));
+          activeReceiver |= ACTIVE_RF; // Enable RF Gateway
+        } else {
+          Log.trace(F("RF inactive:" CR));
+          activeReceiver &= ~ACTIVE_RF; // Disable RF Gateway
+        }
         success = true;
       }
 #    ifdef ZradioCC1101 // set Receive on and Transmitt off
@@ -316,24 +321,13 @@ void enableRFReceive() {
 #  else
   Log.notice(F("Switching to RF Receiver" CR));
 #  endif
-#  ifndef ARDUINO_AVR_UNO // Space issues with the UNO
-#    ifdef ZgatewayPilight
-  disablePilightReceive();
-#    endif
-#    ifdef ZgatewayRTL_433
-  disableRTLreceive();
-#    endif
-#  endif
-#  ifdef ZgatewayRF2
-  disableRF2Receive();
-#  endif
 
 #  ifdef ZradioCC1101 // set Receive on and Transmitt off
   ELECHOUSE_cc1101.Init();
   ELECHOUSE_cc1101.SetRx(receiveMhz);
 #  endif
   mySwitch.disableTransmit();
-  receiveInterupt = RF_RECEIVER_GPIO;
-  mySwitch.enableReceive(RF_RECEIVER_GPIO);
+  receiveInterupt = RF_RF_RECEIVER_GPIO;
+  mySwitch.enableReceive(RF_RF_RECEIVER_GPIO);
 }
 #endif

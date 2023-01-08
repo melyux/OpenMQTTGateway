@@ -1687,7 +1687,7 @@ void stateMeasures() {
   SYSdata["mhz"] = (float)receiveMhz;
 #  endif
 #  if defined(ZgatewayRTL_433)
-  if (activeReceiver == ACTIVE_RTL) {
+  if ((activeReceiver & ACTIVE_RTL) == ACTIVE_RTL) {
     SYSdata["RTLRssiThresh"] = (int)getRTLrssiThreshold();
     SYSdata["RTLRssi"] = (int)getRTLCurrentRSSI();
     SYSdata["RTLAVGRssi"] = (int)getRTLAverageRSSI();

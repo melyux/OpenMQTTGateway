@@ -9,34 +9,34 @@ With version 0.9.7 the ability to switch active signal receiver and decoder is s
 
 Switching of the active receiver module is available between the RF, RF2, RTL_433 and Pilight Gateway modules, allowing for changing of signal decoders without redeploying the openMQTTGateway package.  Sending a JSON message to the command topic of the desired receiver will change the active receiver module.
 
-To enable the RF Gateway module send a json message to the RF Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored. 
+To enable the RF Gateway module send a json message to the RF Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored.
 
 Example:
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTto433" -m '{"active":true}'`
 
-To enable the PiLight Gateway module send a json message to the PiLight Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored. 
+To enable the PiLight Gateway module send a json message to the PiLight Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored.
 
 Example:
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoPilight" -m '{"active":true}'`
 
-To enable the RF2 Gateway module send a json message to the RF2 Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored. 
+To enable the RF2 Gateway module send a json message to the RF2 Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored.
 
 Example:
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoRF2" -m '{"active":true}'`
 
-To enable the RTL_433 Gateway module send a json message to the RTL_433 Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored. 
+To enable the RTL_433 Gateway module send a json message to the RTL_433 Gateway module command subject with the key being 'active', and any value.  The value at this time is ignored.
 
 Example:
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoRTL_433" -m '{"active":true}'`
 
 ### Status Messages
 
-The openMQTTGateway status message contains a key `actRec` which is the current active receiver module.
+The openMQTTGateway status message contains a key `actRec` which is the bitfield of the active receiver module(s).
 
 1 - PiLight
 2 - RF
-3 - RTL_433
-4 - RF2
+4 - RTL_433
+8 - RF2
 
 ## RCSwitch based gateway
 
@@ -56,7 +56,7 @@ To disable transmit functions to allow the use of another pin, add the following
 
 `#define RF_DISABLE_TRANSMIT`
 
-### Send data by MQTT to convert it on RF signal 
+### Send data by MQTT to convert it on RF signal
 
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTto433" -m '{"value":1315156}'`
 
@@ -106,7 +106,7 @@ Default receive frequency of the CC1101 module is 433.92 Mhz, and this can be ca
 
 `home/OpenMQTTGateway/commands/MQTTto433 {"mhz":315.026}`
 
-Messages received will include the frequency, and when transmitting on a different frequency the module return to the receive frequency afterwards.  ie transmit messages on 303.732 Mhz then receive messages on 433.92 Mhz 
+Messages received will include the frequency, and when transmitting on a different frequency the module return to the receive frequency afterwards.  ie transmit messages on 303.732 Mhz then receive messages on 433.92 Mhz
 
 `{"value":4534142,"protocol":6,"length":26,"delay":356,"mhz":315.026}`
 
@@ -126,11 +126,11 @@ Generate your RF signals by pressing a remote button or other and you will see :
 It is possible to limit the protocols that Pilight will respond to, this can help reduce noise from unwanted devices and in some cases disable conflicting protocols.
 
 #### Available protocols
-To list the available protocols on the Serial - 
+To list the available protocols on the Serial -
 
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoPilight/protocols" -m '{"available":true}'`
 #### Limit protocols
-To limit the protocols, send a JSON array of protocols as below - 
+To limit the protocols, send a JSON array of protocols as below -
 
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoPilight/protocols -m '{"limit": ["array", "of", "protocols"]}'`
 
@@ -141,7 +141,7 @@ To reset and listen to all protocols -
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoPilight/protocols -m '{"reset": true}`'
 
 #### Enabled protocols
-To list the enabled protocols on the Serial - 
+To list the enabled protocols on the Serial -
 
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoPilight/protocols" -m '{"enabled":true}'`
 
@@ -189,7 +189,7 @@ OpenMQTTGateway process the raw value to extract the other decimal values that c
 
 NOTE: currently the device doesn't receive correct values from Switches remote control
 
-### Send data by MQTT to convert it on RF signal 
+### Send data by MQTT to convert it on RF signal
 `mosquitto_pub -t "home/OpenMQTTGateway/commands/MQTTtoSRFB" -m '{"value":1315156}'`
 
 This command will send by RF the code 1315156 and use the default parameters:
@@ -207,7 +207,7 @@ if you want to use a low time of 315 put inside your json payload "Tlow":315
 
 if you want to use a high time of 845 put inside your json payload "Thigh":845
 
-if you want to use a sync time of 9123 put inside your json payload "Tsyn":9123 
+if you want to use a sync time of 9123 put inside your json payload "Tsyn":9123
 
 Example:
 `mosquitto_pub -t home/OpenMQTTGateway/commands/MQTTtoSRFB/Tlow_315/Thigh_845/Tsyn_9123 -m '{"value":"33151562","delay":"9123","val_Thigh":"845","val_Tlow":"315"}'`
@@ -233,7 +233,7 @@ Generate your RF signals by pressing a remote button or other and you will see :
 
 `home/OpenMQTTGateway/RF2toMQTT {"unit":0,"groupBit":0,"period":273,"address":8233228,"switchType":0}`
 
-### Send data by MQTT to convert it on KAKU signal 
+### Send data by MQTT to convert it on KAKU signal
 
 Once you get the infos publish the parameters with MQTT like that for off:
 

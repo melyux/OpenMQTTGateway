@@ -1,17 +1,17 @@
-/*  
-  OpenMQTTGateway  - ESP8266 or Arduino program for home automation 
+/*
+  OpenMQTTGateway  - ESP8266 or Arduino program for home automation
 
-   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker 
+   Act as a wifi or ethernet gateway between your 433mhz/infrared IR signal  and a MQTT broker
    Send and receiving command by MQTT
- 
+
   This gateway enables to:
  - publish MQTT data to a different topic related to received 433Mhz signal DIO/new kaku protocol
 
     Copyright: (c)Florian ROBERT
     Copyright: (c)Randy Simons http://randysimons.nl/
-  
+
     This file is part of OpenMQTTGateway.
-    
+
     OpenMQTTGateway is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -61,9 +61,9 @@ void setupRF2() {
   ELECHOUSE_cc1101.setMHZ(receiveMhz);
   ELECHOUSE_cc1101.SetRx(receiveMhz);
 #  endif
-  NewRemoteReceiver::init(RF_RECEIVER_GPIO, 2, rf2Callback);
+  NewRemoteReceiver::init(RF_RF2_RECEIVER_GPIO, 2, rf2Callback);
   Log.notice(F("RF_EMITTER_GPIO: %d " CR), RF_EMITTER_GPIO);
-  Log.notice(F("RF_RECEIVER_GPIO: %d " CR), RF_RECEIVER_GPIO);
+  Log.notice(F("RF_RF2_RECEIVER_GPIO: %d " CR), RF_RF2_RECEIVER_GPIO);
   Log.trace(F("ZgatewayRF2 command topic: %s%s%s" CR), mqtt_topic, gateway_name, subjectMQTTtoRF2);
   Log.trace(F("ZgatewayRF2 setup done " CR));
   pinMode(RF_EMITTER_GPIO, OUTPUT);
@@ -314,8 +314,13 @@ void MQTTtoRF2(char* topicOri, JsonObject& RF2data) { // json object decoding
       }
     }
     if (RF2data.containsKey("active")) {
-      Log.trace(F("RF2 active:" CR));
-      activeReceiver = ACTIVE_RF2;
+      if (RF2data["active"].as<bool>()) {
+        Log.trace(F("RF2 active:" CR));
+        activeReceiver |= ACTIVE_RF2; // Enable RF2 Gateway
+      } else {
+        Log.trace(F("RF2 inactive:" CR));
+        activeReceiver &= ~ACTIVE_RF2; // Disable RF2 Gateway
+      }
       success = true;
     }
 #    ifdef ZradioCC1101 // set Receive on and Transmitt off
@@ -352,21 +357,12 @@ void enableRF2Receive() {
 #  else
   Log.notice(F("Switching to RF2 Receiver" CR));
 #  endif
-#  ifdef ZgatewayPilight
-  disablePilightReceive();
-#  endif
-#  ifdef ZgatewayRTL_433
-  disableRTLreceive();
-#  endif
-#  ifdef ZgatewayRF
-  disableRFReceive();
-#  endif
 
 #  ifdef ZradioCC1101
   ELECHOUSE_cc1101.Init();
   ELECHOUSE_cc1101.SetRx(receiveMhz); // set Receive on
 #  endif
-  NewRemoteReceiver::init(RF_RECEIVER_GPIO, 2, rf2Callback);
+  NewRemoteReceiver::init(RF_RF2_RECEIVER_GPIO, 2, rf2Callback);
 }
 
 #endif

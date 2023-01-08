@@ -85,10 +85,10 @@ void setupPilight() {
   ELECHOUSE_cc1101.SetRx(CC1101_FREQUENCY);
 #  endif
   rf.setCallback(pilightCallback);
-  rf.initReceiver(RF_RECEIVER_GPIO);
+  rf.initReceiver(RF_PILIGHT_RECEIVER_GPIO);
   pinMode(RF_EMITTER_GPIO, OUTPUT); // Set this here, because if this is the RX pin it was reset to INPUT by Serial.end();
   Log.notice(F("RF_EMITTER_GPIO: %d " CR), RF_EMITTER_GPIO);
-  Log.notice(F("RF_RECEIVER_GPIO: %d " CR), RF_RECEIVER_GPIO);
+  Log.notice(F("RF_PILIGHT_RECEIVER_GPIO: %d " CR), RF_PILIGHT_RECEIVER_GPIO);
   Log.trace(F("ZgatewayPilight command topic: %s%s%s" CR), mqtt_topic, gateway_name, subjectMQTTtoPilight);
   Log.trace(F("ZgatewayPilight setup done " CR));
 }
@@ -249,8 +249,13 @@ void MQTTtoPilight(char* topicOri, JsonObject& Pilightdata) {
       }
     }
     if (Pilightdata.containsKey("active")) {
-      Log.trace(F("PiLight active:" CR));
-      activeReceiver = ACTIVE_PILIGHT; // Enable PILIGHT Gateway
+      if (Pilightdata["active"].as<bool>()) {
+        Log.trace(F("PiLight active:" CR));
+        activeReceiver |= ACTIVE_PILIGHT; // Enable PILIGHT Gateway
+      } else {
+        Log.trace(F("PiLight inactive:" CR));
+        activeReceiver &= ~ACTIVE_PILIGHT; // Disable PILIGHT Gateway
+      }
       success = true;
     }
 #  ifdef ZradioCC1101
@@ -282,22 +287,13 @@ extern void enablePilightReceive() {
 #  else
   Log.notice(F("Switching to Pilight Receiver" CR));
 #  endif
-#  ifdef ZgatewayRF
-  disableRFReceive();
-#  endif
-#  ifdef ZgatewayRF2
-  disableRF2Receive();
-#  endif
-#  ifdef ZgatewayRTL_433
-  disableRTLreceive();
-#  endif
 
 #  ifdef ZradioCC1101
   ELECHOUSE_cc1101.Init();
   ELECHOUSE_cc1101.SetRx(receiveMhz); // set Receive on
 #  endif
   rf.setCallback(pilightCallback);
-  rf.initReceiver(RF_RECEIVER_GPIO);
+  rf.initReceiver(RF_PILIGHT_RECEIVER_GPIO);
   pinMode(RF_EMITTER_GPIO, OUTPUT); // Set this here, because if this is the RX pin it was reset to INPUT by Serial.end();
   rf.enableReceiver();
   loadPilightConfig();
