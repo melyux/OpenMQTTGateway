@@ -1620,6 +1620,32 @@ void setup() {
   THEENGS_LOG_NOTICE(F("************** Setup OpenMQTTGateway end **************" CR));
 }
 
+#ifdef ESP32
+// Helper to fully reset the ESP32 WiFi driver.
+//
+// We occasionally see the ESP32 get stuck in a state where calls to
+// esp_wifi_connect() / WiFi.begin() return ESP_ERR_WIFI_CONN
+// ("sta is connecting") after an AP reboot. Resetting the driver
+// here clears that state so reconnects can succeed without
+// requiring a full MCU reset.
+void forceWifiReinit() {
+  THEENGS_LOG_WARNING(F("ESP32: forcing full WiFi driver reset before reconnect" CR));
+
+  // Drop any current connection and clear internal state
+  WiFi.disconnect(true, true);
+  delay(100);
+
+  // Fully stop and restart the WiFi driver
+  esp_wifi_stop();
+  delay(100);
+  esp_wifi_start();
+  delay(100);
+
+  // Ensure we are back in station mode
+  WiFi.mode(WIFI_STA);
+}
+#endif
+
 // Bypass for ESP not reconnecting automaticaly the second time https://github.com/espressif/arduino-esp32/issues/2501
 bool wifi_reconnect_bypass() {
 #if defined(ESP32) && defined(USE_BLUFI)
@@ -1632,6 +1658,11 @@ bool wifi_reconnect_bypass() {
 #endif
   uint8_t wifi_autoreconnect_cnt = 0;
 #ifdef ESP32
+  // On ESP32, the WiFi driver can get stuck in a "sta is connecting"
+  // state (error 0x3007) after an AP reboot. Force a full WiFi
+  // driver reset before starting the retry loop so we always start
+  // from a clean state.
+  forceWifiReinit();
   while (WiFi.status() != WL_CONNECTED && wifi_autoreconnect_cnt < maxConnectionRetryNetwork) {
 #else
   while (WiFi.waitForConnectResult() != WL_CONNECTED && wifi_autoreconnect_cnt < maxConnectionRetryNetwork) {
@@ -2573,7 +2604,19 @@ void loop() {
     THEENGS_LOG_WARNING(F("Network disconnected" CR));
     gatewayState = GatewayState::NTWK_DISCONNECTED;
     if (!wifi_reconnect_bypass()) {
-      sleep();
+#ifdef ESP32
+      // On ESP32 in always-on power modes, repeatedly failing to reconnect
+      // tends to leave the WiFi driver wedged in a "sta is connecting"
+      // state (0x3007). Instead of spinning forever, restart the ESP32
+      // so it can recover cleanly.
+      if (SYSConfig.powerMode < PowerMode::INTERVAL) {
+        THEENGS_LOG_WARNING(F("ESP32: WiFi reconnect failed, restarting to recover from stuck STA state" CR));
+        ESPRestart(2); // Same reason code as the WiFi watchdog
+      } else
+#endif
+      {
+        sleep();
+      }
     } else {
       gatewayState = GatewayState::NTWK_CONNECTED;
     }
