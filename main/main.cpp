@@ -283,6 +283,8 @@ char ota_hostname[MAC_NAME_MAX_LEN];
 #endif
 int failure_number_ntwk = 0; // number of failure connecting to network
 int failure_number_mqtt = 0; // number of failure connecting to MQTT
+unsigned long first_mqtt_failure_millis = 0; // when the current broker outage started
+int mqtt_reinit_number = 0; // number of MQTT client rebuilds during the current outage
 
 static unsigned long last_ota_activity_millis = 0;
 // Global struct to store live SYS configuration data
@@ -1054,6 +1056,8 @@ void setupMQTT() {
     THEENGS_LOG_NOTICE(F("Connected to broker" CR));
     gatewayState = GatewayState::BROKER_CONNECTED;
     failure_number_mqtt = 0;
+    first_mqtt_failure_millis = 0;
+    mqtt_reinit_number = 0;
     // Once connected, publish an announcement...
     pub(will_Topic, Gateway_AnnouncementMsg, will_Retain);
 
@@ -1079,6 +1083,11 @@ void setupMQTT() {
       // No network connection or offline, ignore this failure
       return;
     }
+
+    if (first_mqtt_failure_millis == 0) {
+      first_mqtt_failure_millis = millis();
+    }
+
     failure_number_mqtt++; // we count the failure
     gatewayState = GatewayState::BROKER_DISCONNECTED;
     THEENGS_LOG_WARNING(F("failure_number_mqtt: %d" CR), failure_number_mqtt);
@@ -1108,7 +1117,19 @@ void setupMQTT() {
 
     delayWithOTA(10000);
 
-    if (failure_number_mqtt > maxRetryWatchDog) {
+    // First line of recovery for broker outages: rebuild the MQTT client instead of
+    // rebooting the whole ESP32. This is much less disruptive and avoids getting
+    // stuck in a reboot loop when the broker is simply down for a few minutes.
+    if (failure_number_mqtt >= 3) {
+      mqtt_reinit_number++;
+      THEENGS_LOG_WARNING(F("MQTT reconnect stalled, rebuilding MQTT client (%d)" CR), mqtt_reinit_number);
+      mqttSetupPending = true;
+      failure_number_mqtt = 0;
+    }
+
+    // Only fall back to a full reboot if the broker has been unreachable for a long
+    // time despite repeated MQTT client rebuilds.
+    if (first_mqtt_failure_millis != 0 && millis() - first_mqtt_failure_millis > 15UL * 60UL * 1000UL) {
 #  ifndef ESPWifiManualSetup
       // Look for the next valid connection
       for (int i = 0; i < cnt_parameters_array_size; i++) {
@@ -1138,6 +1159,7 @@ void setupMQTT() {
         ArduinoOTA.handle();
         delay(100);
       }
+      THEENGS_LOG_WARNING(F("MQTT outage persisted for >15 min, restarting MCU" CR));
       ESPRestart(1);
     }
   };
