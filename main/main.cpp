@@ -1159,8 +1159,13 @@ void setupMQTT() {
         ArduinoOTA.handle();
         delay(100);
       }
+#if defined(ESP32) && defined(ESPWifiManualSetup)
+      THEENGS_LOG_WARNING(F("MQTT outage persisted for >15 min, continuing retries instead of restarting MCU" CR));
+      first_mqtt_failure_millis = millis();
+#else
       THEENGS_LOG_WARNING(F("MQTT outage persisted for >15 min, restarting MCU" CR));
       ESPRestart(1);
+#endif
     }
   };
 
