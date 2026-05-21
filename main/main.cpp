@@ -2630,22 +2630,38 @@ void loop() {
   } else if (!SYSConfig.offline && !SYSConfig.serial) { // disconnected from network
     THEENGS_LOG_WARNING(F("Network disconnected" CR));
     gatewayState = GatewayState::NTWK_DISCONNECTED;
+
     if (!wifi_reconnect_bypass()) {
-#ifdef ESP32
-      // On ESP32 in always-on power modes, repeatedly failing to reconnect
-      // tends to leave the WiFi driver wedged in a "sta is connecting"
-      // state (0x3007). Instead of spinning forever, restart the ESP32
-      // so it can recover cleanly.
+  #ifdef ESP32
       if (SYSConfig.powerMode < PowerMode::INTERVAL) {
-        THEENGS_LOG_WARNING(F("ESP32: WiFi reconnect failed, restarting to recover from stuck STA state" CR));
-        ESPRestart(2); // Same reason code as the WiFi watchdog
+        static uint16_t wifi_reconnect_failed_cycles = 0;
+        static unsigned long last_wifi_reinit_millis = 0;
+
+        wifi_reconnect_failed_cycles++;
+
+        THEENGS_LOG_WARNING(
+            F("ESP32: WiFi reconnect failed, staying alive and retrying (%d)" CR),
+            wifi_reconnect_failed_cycles
+        );
+
+        // Periodically hard-reset the ESP32 WiFi driver, but do NOT reboot the MCU.
+        if (last_wifi_reinit_millis == 0 || millis() - last_wifi_reinit_millis > 60000UL) {
+          last_wifi_reinit_millis = millis();
+          forceWifiReinit();
+        }
+
+        delay(5000);
       } else
-#endif
+  #endif
       {
         sleep();
       }
     } else {
       gatewayState = GatewayState::NTWK_CONNECTED;
+  #ifdef ESP32
+      // Reset the local failure counters once WiFi is back.
+      // If these statics are scoped inside the failure block above, omit this.
+  #endif
     }
   }
 
